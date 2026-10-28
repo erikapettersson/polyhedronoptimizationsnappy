@@ -1,7 +1,13 @@
 
 from sage.all import Polyhedron, MixedIntegerLinearProgram
 
+
 def optimize_linear(inequalities, objective, maximize=True):
+    """Optimize a linear objective over a polyhedron.
+
+    Each inequality (b, a1, a2, ...) means:
+        b + a1*x1 + a2*x2 + ... >= 0
+    """
     P = Polyhedron(ieqs=inequalities)
 
     if P.is_empty():
@@ -10,26 +16,34 @@ def optimize_linear(inequalities, objective, maximize=True):
     lp = MixedIntegerLinearProgram(maximization=maximize)
     variables = lp.new_variable(real=True)
 
-    # Add the polyhedron's inequalities to the linear program.
+    dimension = len(objective)
+
+    if any(len(row) != dimension + 1 for row in inequalities):
+        raise ValueError(
+            "Each inequality must have one constant plus one coefficient per variable."
+        )
+
     for row in inequalities:
         b = row[0]
         coeffs = row[1:]
+
         lp.add_constraint(
-            sum(coeffs[i] * variables[i] for i in range(len(coeffs))),
-            min=-b
+            sum(coeffs[i] * variables[i] for i in range(dimension)),
+            min=-b,
         )
 
     expression = sum(
         objective[i] * variables[i]
-        for i in range(len(objective))
+        for i in range(dimension)
     )
 
     lp.set_objective(expression)
+
     value = lp.solve()
     point = lp.get_values(variables)
 
     return {
         "status": "optimal",
         "objective_value": value,
-        "point": [point[i] for i in range(len(objective))]
+        "point": [point[i] for i in range(dimension)],
     }
